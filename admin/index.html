@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clean Force Admin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#070a36">
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <form id="loginForm" class="login-card">
+    <img src="../assets/brand/logo-light-full.svg" alt="Clean Force" width="200" height="120">
+    <h1>Staff login</h1>
+    <label class="f"><span>Username</span><input name="user" value="admin" autocomplete="username" required></label>
+    <label class="f"><span>Password</span><input name="pass" type="password" value="cleanforce" autocomplete="current-password" required></label>
+    <p class="err" id="loginErr" hidden>Wrong username or password.</p>
+    <button class="b b-pri b-lg" type="submit">Sign in</button>
+    <p class="muted small">Demo login is filled in. Data is sample data that lives in this browser.</p>
+  </form>
+</div>
+
+<div id="app" class="app" hidden>
+  <aside class="side" id="side">
+    <a class="brand" href="#today"><img src="../assets/brand/logo-dark.svg" alt="Clean Force" width="96" height="51"><span>Admin</span></a>
+    <nav class="snav" aria-label="Admin">
+      <a href="#today" data-v="today"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg>Today</a>
+      <a href="#bookings" data-v="bookings"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bookings</a>
+      <a href="#customers" data-v="customers"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-1.5-5-4-5.6"/></svg>Customers</a>
+      <a href="#sales" data-v="sales"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Sales</a>
+      <a href="#teams" data-v="teams"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Teams</a>
+      <a href="#prices" data-v="prices"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Services &amp; prices</a>
+    </nav>
+    <div class="side-foot">
+      <a href="../index.html" target="_blank" rel="noopener">View website &nearr;</a>
+      <button type="button" id="resetBtn">Reset demo data</button>
+      <button type="button" id="logout">Sign out</button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <button class="menu" id="menu" aria-label="Menu" aria-expanded="false" aria-controls="side"><span></span><span></span></button>
+      <h1 id="title">Today</h1>
+      <div class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input id="q" type="search" placeholder="Search name, phone or CF number" autocomplete="off" aria-label="Search customers and bookings">
+        <div class="sres" id="sres" hidden></div>
+      </div>
+      <button class="b b-pri" id="newBtn"><span aria-hidden="true">+</span> New booking</button>
+    </header>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<div class="drawer-bg" id="drawerBg" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drTitle" hidden></aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tip" id="tip" hidden></div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
