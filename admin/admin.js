@@ -10,7 +10,17 @@
   var ui = { bk: { f: 'upcoming', area: '', team: '', n: 40, q: '' }, cu: { sort: 'last', area: '', q: '', n: 50 }, month: today.slice(0, 7) };
 
   function load() { db = CF.db(); today = CF.today(); }
-  function save(msg) { CF.save(db); if (msg) toast(msg); }
+  /* every change goes through CF.api; on success redraw, on failure say why */
+  function act(p, msg, after) {
+    return p.then(function (r) { load(); if (msg) toast(typeof msg === 'function' ? msg(r) : msg); if (after) after(r); else route(); return r; },
+      function (e) { toast(CF.problem(e)); load(); route(); throw e; });
+  }
+  var NEXT = { booked: ['confirmed', 'Confirm'], confirmed: ['onway', 'On the way'], onway: ['cleaning', 'Start'], cleaning: ['done', 'Done'] };
+  function stepBtn(b) {
+    if (b.status === 'cancelled') return '<span class="pill cancelled">Cancelled</span>';
+    if (NEXT[b.status]) return '<button class="b b-sm b-step s-' + b.status + '" data-step="' + b.id + '" title="Mark as ' + CF.statusName(NEXT[b.status][0]).toLowerCase() + '">' + NEXT[b.status][1] + '</button>';
+    return CF.due(b) ? '<button class="b b-sm b-good" data-pay="' + b.id + '">Mark paid</button>' : '<span class="pill paid">Paid</span>';
+  }
   function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('on'); }, 2400); }
   function cust(b) { return CF.customer(b.customerId, db) || { name: 'Unknown', phone: '' }; }
   function svcLine(b) { var s = CF.service(b.service), o = CF.option(b.service, b.option); return (s ? s.name : b.service) + (o ? ', ' + o.name : ''); }
@@ -37,21 +47,24 @@
   function statusSel(b) { return '<select class="sel" data-set="status" data-id="' + b.id + '" aria-label="Status for ' + b.id + '">' + D.statuses.map(function (s) { return '<option value="' + s.id + '"' + (s.id === b.status ? ' selected' : '') + '>' + s.name + '</option>'; }).join('') + '</select>'; }
 
   /* ---------- auth ---------- */
-  function authed() { try { return sessionStorage.getItem(SKEY) === '1'; } catch (e) { return window._cfAdmin; } }
+  function authed() { return !!CF.auth.staff(); }
   function start() {
     if (!authed()) { $('#login').hidden = false; $('#app').hidden = true; return; }
-    $('#login').hidden = true; $('#app').hidden = false; route();
+    $('#login').hidden = true; $('#app').hidden = false;
+    var st = CF.auth.staff(); $('#who').textContent = st.name || 'Office';
+    route();
   }
   $('#loginForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (this.user.value.trim() === 'admin' && this.pass.value === 'cleanforce') { try { sessionStorage.setItem(SKEY, '1'); } catch (x) { window._cfAdmin = true; } start(); }
-    else $('#loginErr').hidden = false;
+    e.preventDefault(); var f = this, btn = f.querySelector('button'); btn.disabled = true; $('#loginErr').hidden = true;
+    CF.auth.staffSignIn(f.user.value, f.pass.value).then(function () { return CF.ready('staff'); }).then(function () { btn.disabled = false; start(); },
+      function (x) { btn.disabled = false; $('#loginErr').textContent = CF.problem(x); $('#loginErr').hidden = false; });
   });
-  $('#logout').addEventListener('click', function () { try { sessionStorage.removeItem(SKEY); } catch (e) { window._cfAdmin = false; } start(); });
-  $('#resetBtn').addEventListener('click', function () { if (confirm('Reset all demo data? Bookings made on the website in this browser will be removed.')) { CF.reset(); route(); toast('Demo data reset'); } });
+  $('#logout').addEventListener('click', function () { CF.auth.staffSignOut().then(start); });
+  $('#resetBtn').addEventListener('click', function () { if (confirm('Reset all demo data? Bookings made on the website in this browser will be removed.')) act(CF.api.reset(), 'Demo data reset'); });
+  if (!CF.isDemo()) { $('#resetBtn').hidden = true; $('#uLbl').textContent = 'Email'; var lf = $('#loginForm'); lf.user.value = ''; lf.pass.value = ''; lf.user.type = 'email'; $('#demoNote').hidden = true; }
 
   /* ---------- router ---------- */
-  var TITLES = { today: 'Today', bookings: 'Bookings', customers: 'Customers', customer: 'Customer', sales: 'Sales', teams: 'Teams', prices: 'Services & prices' };
+  var TITLES = { today: 'Today', bookings: 'Bookings', customers: 'Customers', customer: 'Customer', sales: 'Sales', teams: 'Schedule', prices: 'Prices' };
   function route() {
     load(); tip.hidden = true;
     var h = (location.hash.slice(1) || 'today').split('/'), v = VIEWS[h[0]] ? h[0] : 'today';
@@ -71,18 +84,17 @@
   /* inline selects in tables (team / status) */
   view.addEventListener('change', function (e) {
     var t = e.target; if (!t.dataset.set) return;
-    load(); var b = CF.booking(t.dataset.id, db); if (!b) return;
-    b[t.dataset.set] = t.value;
-    save(b.id + ': ' + (t.dataset.set === 'team' ? (t.value ? CF.team(t.value).name : 'no team') : CF.statusName(t.value)));
-    if (t.dataset.set === 'status') { var row = t.closest('tr, .lrow'); var p = row && row.querySelector('.pill.' + (b.status)); }
+    var patch = {}; patch[t.dataset.set] = t.value;
+    act(CF.api.updateBooking(t.dataset.id, patch), t.dataset.id + ': ' + (t.dataset.set === 'team' ? (t.value ? CF.team(t.value).name : 'no team') : CF.statusName(t.value)));
   });
   view.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-open], [data-cust], [data-pay], [data-go]');
+    var el = e.target.closest('[data-open], [data-cust], [data-pay], [data-go], [data-step]');
     if (!el || e.target.closest('select')) return;
     if (el.dataset.open) openBooking(el.dataset.open);
     else if (el.dataset.cust) location.hash = 'customer/' + el.dataset.cust;
     else if (el.dataset.go) location.hash = el.dataset.go;
-    else if (el.dataset.pay) { load(); var b = CF.booking(el.dataset.pay, db); if (!CF.due(b)) { route(); return; } b.payments.push({ amt: CF.due(b), date: today, method: b.method }); save(b.id + ' marked paid, ' + money(CF.paid(b))); route(); }
+    else if (el.dataset.pay) { load(); var b = CF.booking(el.dataset.pay, db); if (!b || !CF.due(b)) { route(); return; } el.disabled = true; act(CF.api.addPayment(b.id, { amt: CF.due(b), method: b.method }), function (x) { return x.id + ' paid, ' + money(CF.paid(x)); }); }
+    else if (el.dataset.step) { load(); var sb = CF.booking(el.dataset.step, db); if (!sb || !NEXT[sb.status]) { route(); return; } el.disabled = true; act(CF.api.updateBooking(sb.id, { status: NEXT[sb.status][0] }), sb.id + ': ' + CF.statusName(NEXT[sb.status][0])); }
   });
   view.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches('tr.click')) e.target.click(); });
 
@@ -152,7 +164,7 @@
       '<div class="g g21 mt"><div class="card"><div class="card-h"><h2>Today, ' + CF.fmtDate(today, true) + '</h2><span class="muted small">' + todays.length + ' jobs</span></div><div class="card-b">' +
       (todays.length ? todays.map(function (b) {
         var c = cust(b);
-        return '<div class="lrow"><span class="t">' + b.slot + '</span><button class="who" data-open="' + b.id + '"><b>' + esc(c.name) + '</b><small>' + esc(svcLine(b)) + ' &middot; ' + esc(b.address) + ', ' + esc(CF.area(b.area).name) + '</small></button>' + teamSel(b) + statusSel(b) + '</div>';
+        return '<div class="lrow job s-' + b.status + '"><span class="t">' + b.slot + '</span><button class="who" data-open="' + b.id + '"><b>' + esc(c.name) + ' ' + pill(b.status) + '</b><small>' + esc(svcLine(b)) + ' &middot; ' + esc(b.address) + ', ' + esc(CF.area(b.area).name) + '</small></button>' + teamSel(b) + stepBtn(b) + '</div>';
       }).join('') : '<p class="empty">No jobs today.</p>') + '</div></div>' +
       '<div class="card"><div class="card-h"><h2>To collect</h2><a class="small" href="#bookings" id="seeUnpaid">See all</a></div><div class="card-b">' +
       (owing.length ? owing.sort(function (a, b) { return a.date.localeCompare(b.date); }).slice(0, 6).map(function (b) {
@@ -274,7 +286,7 @@
         return '<li data-open="' + b.id + '" tabindex="0"><span class="dot ' + b.status + '"></span><span><b>' + esc(svcLine(b)) + '</b><small>' + CF.fmtDate(b.date, true) + ', ' + b.slot + ' &middot; ' + b.id + (b.team ? ' &middot; ' + CF.team(b.team).name : '') + '</small>' + (b.notes ? '<small>' + esc(b.notes) + '</small>' : '') + '</span>' +
           '<span class="r"><b>' + money(b.price) + '</b><br>' + (b.status === 'done' ? payPill(b) : pill(b.status)) + '</span></li>';
       }).join('') : '<li class="empty">No bookings yet.</li>') + '</ul></div></div></div></div>';
-    $('#cNotes').addEventListener('change', function () { load(); var cc = CF.customer(c.id, db); cc.notes = this.value; save('Notes saved'); });
+    $('#cNotes').addEventListener('change', function () { var v = this.value; act(CF.api.saveCustomer({ id: c.id, name: c.name, phone: c.phone, notes: v }), 'Notes saved', function () { }); });
     $('#editC').addEventListener('click', function () { editCustomer(c); });
     $('#bookC').addEventListener('click', function () { newBooking(c); });
     $$('.hist li[data-open]').forEach(function (li) { li.addEventListener('keydown', function (e) { if (e.key === 'Enter') li.click(); }); });
@@ -330,20 +342,27 @@
     });
   };
 
-  /* ---------- TEAMS ---------- */
+  /* ---------- SCHEDULE: teams down the side, the next 7 days across ---------- */
   var CREW = { A: ['Hassan', 'Mohamed', 'Shareef'], B: ['Rifaz', 'Ali', 'Naseer'], C: ['Shiyam', 'Ahmed', 'Zahir'], D: ['Nashid', 'Ibrahim', 'Waheed'] };
   VIEWS.teams = function () {
-    var ym = month(today), wEnd = CF.addDays(today, 6);
-    view.innerHTML = '<div class="g g2">' + D.teams.map(function (t) {
-      var tj = db.bookings.filter(function (b) { return b.team === t.id && b.status !== 'cancelled'; });
-      var todayJ = tj.filter(function (b) { return b.date === today; }).sort(function (a, b) { return a.slot.localeCompare(b.slot); });
-      var week = tj.filter(function (b) { return b.date >= today && b.date <= wEnd; }).length;
-      var mJobs = tj.filter(function (b) { return month(b.date) === ym && b.status === 'done'; });
-      var mVal = mJobs.reduce(function (s, b) { return s + b.price; }, 0);
-      return '<div class="card team"><div class="card-h"><div><h3>' + t.name + '</h3><div class="crew">' + CREW[t.id].map(function (n) { return '<i title="' + n + '">' + n[0] + '</i>'; }).join('') + '<span class="muted small">' + CREW[t.id].join(', ') + '</span></div></div></div>' +
-        '<div class="card-b"><div class="g" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px"><div><span class="muted small">Today</span><br><b>' + todayJ.length + (todayJ.length === 1 ? ' job' : ' jobs') + '</b></div><div><span class="muted small">Next 7 days</span><br><b>' + week + (week === 1 ? ' job' : ' jobs') + '</b></div><div><span class="muted small">This month</span><br><b class="num">' + money(mVal) + '</b></div></div>' +
-        (todayJ.length ? todayJ.map(function (b) { var c = cust(b); return '<div class="lrow" style="grid-template-columns:56px 1fr auto"><span class="t">' + b.slot + '</span><button class="who" data-open="' + b.id + '"><b>' + esc(c.name) + '</b><small>' + esc(svcLine(b)) + ' &middot; ' + esc(b.address) + '</small></button>' + pill(b.status) + '</div>'; }).join('') : '<p class="empty">Free today.</p>') + '</div></div>';
-    }).join('') + '</div>';
+    var start = ui.wk || today, days = []; for (var i = 0; i < 7; i++) days.push(CF.addDays(start, i));
+    var rows = D.teams.map(function (t) { return { id: t.id, name: t.name, sub: (CREW[t.id] || [t.lead]).join(', ') }; }).concat([{ id: '', name: 'No team yet', sub: 'Assign from the booking' }]);
+    var jobs = db.bookings.filter(function (b) { return b.date >= days[0] && b.date <= days[6] && b.status !== 'cancelled'; });
+    var unassigned = jobs.filter(function (b) { return !b.team; }).length;
+    view.innerHTML = '<div class="bar"><button class="b" id="wPrev" aria-label="Previous week">&larr;</button><h2 style="font-size:17px;min-width:190px;text-align:center">' + CF.fmtDate(days[0]) + ' to ' + CF.fmtDate(days[6]) + '</h2><button class="b" id="wNext" aria-label="Next week">&rarr;</button>' +
+      (start !== today ? '<button class="b" id="wToday">This week</button>' : '') + '<span class="grow"></span><span class="muted small">' + jobs.length + ' jobs' + (unassigned ? ' &middot; <b style="color:var(--warn)">' + unassigned + ' without a team</b>' : '') + '</span></div>' +
+      '<div class="card tw"><div class="sched" style="--n:7"><div class="sh"></div>' + days.map(function (d) { return '<div class="sh' + (d === today ? ' now' : '') + '"><b>' + CF.fmtDate(d, true).split(' ')[0] + '</b> ' + CF.parse(d).getDate() + '</div>'; }).join('') +
+      rows.map(function (r) {
+        if (!r.id && !jobs.some(function (b) { return !b.team; })) return '';
+        return '<div class="sr"><b>' + esc(r.name) + '</b><small>' + esc(r.sub) + '</small></div>' + days.map(function (d) {
+          var list = jobs.filter(function (b) { return b.date === d && (b.team || '') === r.id; }).sort(function (a, b) { return a.slot.localeCompare(b.slot); });
+          return '<div class="sc' + (d === today ? ' now' : '') + '">' + list.map(function (b) { var c = cust(b); return '<button class="jb s-' + b.status + '" data-open="' + b.id + '"><b>' + b.slot + '</b> ' + esc(c.name.split(' ')[0]) + '<small>' + esc(CF.service(b.service).name.split(' ')[0]) + ' &middot; ' + esc(CF.area(b.area).name.replace('Hulhumalé Phase 2', 'Phase 2')) + '</small></button>'; }).join('') + '</div>';
+        }).join('');
+      }).join('') + '</div></div>' +
+      '<p class="muted small" style="margin-top:12px">Tap a job to change its team, time or status.</p>';
+    $('#wPrev').addEventListener('click', function () { ui.wk = CF.addDays(start, -7); VIEWS.teams(); });
+    $('#wNext').addEventListener('click', function () { ui.wk = CF.addDays(start, 7); VIEWS.teams(); });
+    var wt = $('#wToday'); if (wt) wt.addEventListener('click', function () { ui.wk = ''; VIEWS.teams(); });
   };
 
   /* ---------- PRICES ---------- */
@@ -358,11 +377,11 @@
       }).join('') + '<tr><td><b>Extras</b></td><td colspan="3" class="muted">' + D.addons.map(function (a) { return esc(a.name) + ' ' + money(a.price); }).join(' &middot; ') + '</td></tr></tbody></table></div>';
     $$('.ptable input', view).forEach(function (i) { i.addEventListener('input', function () { i.classList.toggle('changed', +i.value !== CF.price(i.dataset.s, i.dataset.o, db)); }); });
     $('#pSave').addEventListener('click', function () {
-      load(); db.prices = db.prices || {};
-      $$('.ptable input', view).forEach(function (i) { if (i.value.trim() === '' || isNaN(+i.value) || +i.value <= 0) return; var v = Math.round(+i.value); var list = CF.option(i.dataset.s, i.dataset.o).price; db.prices[i.dataset.s] = db.prices[i.dataset.s] || {}; if (v === list) delete db.prices[i.dataset.s][i.dataset.o]; else db.prices[i.dataset.s][i.dataset.o] = v; });
-      save('Prices saved. The website is updated.'); VIEWS.prices();
+      load(); var map = JSON.parse(JSON.stringify(db.prices || {}));
+      $$('.ptable input', view).forEach(function (i) { if (i.value.trim() === '' || isNaN(+i.value) || +i.value <= 0) return; var v = Math.round(+i.value); var list = CF.option(i.dataset.s, i.dataset.o).price; map[i.dataset.s] = map[i.dataset.s] || {}; if (v === list) delete map[i.dataset.s][i.dataset.o]; else map[i.dataset.s][i.dataset.o] = v; });
+      act(CF.api.setPrices(map), 'Prices saved. The website is updated.');
     });
-    $('#pReset').addEventListener('click', function () { db.prices = {}; save('Prices back to the list'); VIEWS.prices(); });
+    $('#pReset').addEventListener('click', function () { act(CF.api.setPrices({}), 'Prices back to the list'); });
   };
 
   /* ---------- drawer ---------- */
@@ -412,17 +431,15 @@
     var f = $('#bf');
     $('#toCust').addEventListener('click', function () { closeDrawer(); location.hash = 'customer/' + c.id; });
     $('#cls').addEventListener('click', closeDrawer);
-    var cur = function () { load(); return CF.booking(b.id, db); };
-    var commit = function (x) { x.status = f.status.value; x.team = f.team.value; x.date = f.date.value || x.date; x.slot = f.slot.value; x.notes = f.notes.value; return x; };
-    $('#sv').addEventListener('click', function () { commit(cur()); save(b.id + ' saved'); closeDrawer(); route(); refocus(b.id); });
+    var patch = function () { return { status: f.status.value, team: f.team.value, date: f.date.value || b.date, slot: f.slot.value, notes: f.notes.value }; };
+    $('#sv').addEventListener('click', function () { this.disabled = true; act(CF.api.updateBooking(b.id, patch()), b.id + ' saved', function () { closeDrawer(); route(); refocus(b.id); }); });
     var rp = $('#recPay');
     if (rp) rp.addEventListener('click', function () {
-      var x = commit(cur()), amt = Math.min(CF.due(x), Math.max(0, Math.round(+f.amt.value || 0))); if (!amt) return;
-      x.payments.push({ amt: amt, date: today, method: f.pm.value }); x.method = f.pm.value;
-      save(money(amt) + ' recorded on ' + b.id); route(); openBooking(b.id);
+      var amt = Math.min(due, Math.max(0, Math.round(+f.amt.value || 0))); if (!amt) return; rp.disabled = true;
+      act(CF.api.updateBooking(b.id, patch()).then(function () { return CF.api.addPayment(b.id, { amt: amt, method: f.pm.value }); }), money(amt) + ' recorded on ' + b.id, function () { route(); openBooking(b.id); });
     });
     var cx = $('#cxl');
-    if (cx) cx.addEventListener('click', function () { if (!confirm('Cancel ' + b.id + '?')) return; var x = cur(); x.status = 'cancelled'; x.team = ''; save(b.id + ' cancelled'); closeDrawer(); route(); refocus(b.id); });
+    if (cx) cx.addEventListener('click', function () { if (!confirm('Cancel ' + b.id + '?')) return; act(CF.api.updateBooking(b.id, { status: 'cancelled' }), b.id + ' cancelled', function () { closeDrawer(); route(); refocus(b.id); }); });
   }
 
   /* ---------- new booking (phone, WhatsApp, walk-in) ---------- */
@@ -464,10 +481,10 @@
     $('#sv').addEventListener('click', function () {
       var ph = CF.normPhone(f.phone.value);
       if (!/^[3-9]\d{6}$/.test(ph) || !f.name.value.trim() || !f.address.value.trim()) { $('#nErr').hidden = false; return; }
-      var b = CF.addBooking({ phone: ph, name: f.name.value.trim(), area: f.area.value, address: f.address.value.trim(), service: f.service.value, option: f.option.value, addons: [],
+      this.disabled = true;
+      act(CF.api.createBooking({ byStaff: true, phone: ph, name: f.name.value.trim(), area: f.area.value, address: f.address.value.trim(), service: f.service.value, option: f.option.value, addons: [],
         price: Math.max(0, Math.round(+f.price.value || 0)), date: f.date.value, slot: f.slot.value, team: f.team.value, method: f.method.value, source: f.source.value,
-        notes: f.notes.value.trim(), status: f.team.value ? 'confirmed' : 'booked' });
-      closeDrawer(); load(); toast(b.id + ' created for ' + f.name.value.trim()); route();
+        notes: f.notes.value.trim() }), null, function (b) { closeDrawer(); toast(b.id + ' created for ' + f.name.value.trim()); route(); });
     });
   }
   $('#newBtn').addEventListener('click', function () { newBooking(null); });
@@ -483,13 +500,11 @@
     var f = $('#ef');
     $('#cls').addEventListener('click', closeDrawer);
     $('#sv').addEventListener('click', function () {
-      load(); if (c) c = CF.customer(c.id, db);
-      var ph = CF.normPhone(f.phone.value), other = CF.customerByPhone(ph, db);
-      if (!f.name.value.trim() || !/^[3-9]\d{6}$/.test(ph)) { $('#eErr').hidden = false; $('#eErr').textContent = 'Add a name and a 7 digit phone.'; return; }
-      if (other && (!c || other.id !== c.id)) { $('#eErr').hidden = false; $('#eErr').textContent = 'That phone belongs to ' + other.name + '.'; return; }
-      if (!c) { c = { id: 'C' + (db.nextCustomer++), since: today, notes: '' }; db.customers.push(c); }
-      c.name = f.name.value.trim(); c.phone = ph; c.area = f.area.value; c.address = f.address.value.trim(); c.business = f.biz.checked;
-      save('Customer saved'); closeDrawer(); location.hash = 'customer/' + c.id; route();
+      var ph = CF.normPhone(f.phone.value);
+      if (!f.name.value.trim() || !CF.validPhone(ph)) { $('#eErr').hidden = false; $('#eErr').textContent = 'Add a name and a 7 digit phone.'; return; }
+      CF.api.saveCustomer({ id: c ? c.id : '', name: f.name.value.trim(), phone: ph, area: f.area.value, address: f.address.value.trim(), business: f.biz.checked }).then(function (x) {
+        load(); toast('Customer saved'); closeDrawer(); location.hash = 'customer/' + x.id; route();
+      }, function (x) { $('#eErr').hidden = false; $('#eErr').textContent = x.code === 'phone_taken' && x.other ? 'That phone belongs to ' + x.other.name + '.' : CF.problem(x); });
     });
   }
 
@@ -518,5 +533,5 @@
   });
   document.addEventListener('click', function (e) { if (!e.target.closest('.search')) sr.hidden = true; });
 
-  start();
+  CF.ready('staff').then(start, function () { $('#login').hidden = false; $('#loginErr').textContent = 'Could not reach the database. Check the connection.'; $('#loginErr').hidden = false; });
 })();

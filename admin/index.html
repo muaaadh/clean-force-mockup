@@ -17,11 +17,11 @@
   <form id="loginForm" class="login-card">
     <img src="../assets/brand/logo-light-full.svg" alt="Clean Force" width="200" height="120">
     <h1>Staff login</h1>
-    <label class="f"><span>Username</span><input name="user" value="admin" autocomplete="username" required></label>
+    <label class="f"><span id="uLbl">Username</span><input name="user" value="admin" autocomplete="username" required></label>
     <label class="f"><span>Password</span><input name="pass" type="password" value="cleanforce" autocomplete="current-password" required></label>
-    <p class="err" id="loginErr" hidden>Wrong username or password.</p>
+    <p class="err" id="loginErr" hidden role="alert">Wrong username or password.</p>
     <button class="b b-pri b-lg" type="submit">Sign in</button>
-    <p class="muted small">Demo login is filled in. Data is sample data that lives in this browser.</p>
+    <p class="muted small" id="demoNote">Demo login is filled in. The data is sample data that lives in this browser.</p>
   </form>
 </div>
 
@@ -33,10 +33,11 @@
       <a href="#bookings" data-v="bookings"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bookings</a>
       <a href="#customers" data-v="customers"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-1.5-5-4-5.6"/></svg>Customers</a>
       <a href="#sales" data-v="sales"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Sales</a>
-      <a href="#teams" data-v="teams"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Teams</a>
-      <a href="#prices" data-v="prices"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Services &amp; prices</a>
+      <a href="#teams" data-v="teams"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9 4v17"/></svg>Schedule</a>
+      <a href="#prices" data-v="prices"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Prices</a>
     </nav>
     <div class="side-foot">
+      <span class="who-am" id="who">Office</span>
       <a href="../index.html" target="_blank" rel="noopener">View website &nearr;</a>
       <button type="button" id="resetBtn">Reset demo data</button>
       <button type="button" id="logout">Sign out</button>
@@ -63,6 +64,7 @@
 <div class="tip" id="tip" hidden></div>
 
 <script src="../assets/js/data.js"></script>
+<script src="../assets/js/config.js"></script>
 <script src="../assets/js/store.js"></script>
 <script src="admin.js"></script>
 </body>

@@ -14,19 +14,19 @@ window.CF_DATA = {
   ],
 
   services: [
-    { id: 'home', name: 'Home cleaning', short: 'Regular clean, every room', unit: 'Flat size', img: 'assets/img/living-after.jpg',
+    { id: 'home', name: 'Home cleaning', short: 'Regular clean, every room', incl: ['Every room dusted and mopped', 'Kitchen and bathroom wiped down', 'Beds made, bins out'], unit: 'Flat size', img: 'assets/img/living-after.jpg',
       options: [ { id: '1br', name: '1 bedroom', price: 450 }, { id: '2br', name: '2 bedrooms', price: 650 }, { id: '3br', name: '3 bedrooms', price: 850 } ] },
-    { id: 'deep', name: 'Deep cleaning', short: 'Top to bottom, inside and out', unit: 'Flat size', img: 'assets/img/kitchen-after.jpg',
+    { id: 'deep', name: 'Deep cleaning', short: 'Top to bottom, inside and out', incl: ['Inside cupboards and appliances', 'Grease, scale and mould off', 'Fans, doors and skirting'], unit: 'Flat size', img: 'assets/img/kitchen-after.jpg',
       options: [ { id: '1br', name: '1 bedroom', price: 700 }, { id: '2br', name: '2 bedrooms', price: 1100 }, { id: '3br', name: '3 bedrooms', price: 1400 } ] },
-    { id: 'move', name: 'Move in / move out', short: 'Empty flat, handover ready', unit: 'Flat size', img: 'assets/img/bedroom-after.jpg',
+    { id: 'move', name: 'Move in / move out', short: 'Empty flat, handover ready', incl: ['Empty flat, top to bottom', 'Inside every cupboard', 'Ready for the handover'], unit: 'Flat size', img: 'assets/img/bedroom-after.jpg',
       options: [ { id: '1br', name: '1 bedroom', price: 900 }, { id: '2br', name: '2 bedrooms', price: 1300 }, { id: '3br', name: '3 bedrooms', price: 1700 } ] },
-    { id: 'sofa', name: 'Sofa cleaning', short: 'Shampoo and stain removal', unit: 'Seats', img: 'assets/img/sofa-after.jpg',
+    { id: 'sofa', name: 'Sofa cleaning', short: 'Shampoo and stain removal', incl: ['Shampoo and extraction', 'Stain treatment', 'Fabric safe products'], unit: 'Seats', img: 'assets/img/sofa-after.jpg',
       options: [ { id: '3s', name: '3 seats', price: 450 }, { id: '5s', name: '5 seats', price: 700 }, { id: '7s', name: '7 seats', price: 950 } ] },
-    { id: 'bath', name: 'Bathroom and kitchen', short: 'Scale, grease and mould', unit: 'Rooms', img: 'assets/img/bathroom-after.jpg',
+    { id: 'bath', name: 'Bathroom and kitchen', short: 'Scale, grease and mould', incl: ['Scale and mould removed', 'Grout and taps polished', 'Hob and hood degreased'], unit: 'Rooms', img: 'assets/img/bathroom-after.jpg',
       options: [ { id: 'b1', name: '1 bathroom', price: 300 }, { id: 'bk', name: 'Kitchen', price: 400 }, { id: 'b2k', name: '2 bathrooms + kitchen', price: 900 } ] },
-    { id: 'monthly', name: 'Monthly plan', short: '4 visits a month', unit: 'Flat size', img: 'assets/img/crew-mop.jpg', monthly: true,
+    { id: 'monthly', name: 'Monthly plan', short: '4 visits a month', incl: ['Four visits a month', 'Same team every time', 'Pay once a month'], unit: 'Flat size', img: 'assets/img/crew-mop.jpg', monthly: true,
       options: [ { id: '1br', name: '1 bedroom', price: 1600 }, { id: '2br', name: '2 bedrooms', price: 2300 }, { id: '3br', name: '3 bedrooms', price: 3000 } ] },
-    { id: 'office', name: 'Office cleaning', short: 'Desks, floors, pantry', unit: 'Office size', img: 'assets/img/office.jpg',
+    { id: 'office', name: 'Office cleaning', short: 'Desks, floors, pantry', incl: ['Desks, floors and pantry', 'Before you open or after you close', 'Monthly invoice if regular'], unit: 'Office size', img: 'assets/img/office.jpg',
       options: [ { id: 'o1', name: 'Up to 2 rooms', price: 600 }, { id: 'o3', name: '3 to 4 rooms', price: 1100 }, { id: 'o5', name: '5 rooms or more', price: 1600 } ] }
   ],
 
@@ -38,6 +38,8 @@ window.CF_DATA = {
   ],
 
   slots: ['08:00', '10:30', '13:30', '16:00'],
+  fridayFrom: '13:30', // Friday visits start after prayer
+  bookAhead: 30,       // days ahead a customer can book online
 
   teams: [
     { id: 'A', name: 'Team A', lead: 'Hassan' },
